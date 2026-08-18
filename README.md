@@ -79,7 +79,7 @@ INTENT ──► VALIDATED ──► EXECUTING ──► EXECUTED ──► CONF
 
 1. **Amazon Bedrock** — Claude (reasoning + tool-use agent loop, via the official `anthropic[bedrock]` SDK) and **Titan Embeddings v2** (1024-dim invoice embeddings).
 2. **AWS Lambda** — serverless execution of payment steps, recovery sweeps and due-date reminders (`lambda/handler.py`).
-3. **Amazon S3** — invoice PDF storage (`invoices.s3_key`).
+3. **Amazon S3** — invoice PDF storage. Every invoice gets a generated PDF at `s3://<bucket>/invoices/<invoice_id>.pdf`, referenced by `invoices.s3_key`. The agent's `get_invoice_document` tool returns a presigned link, so when a payment is **BLOCKED** the user can open the exact document that was rejected. CockroachDB holds the state; S3 holds the source document behind it.
 
 ## Quickstart
 
@@ -89,12 +89,13 @@ pip install -r requirements.txt
 cp .env.example .env        # paste your CockroachDB Cloud connection string
                             # + AWS credentials via `aws configure`
 
-python -m payguard init-db  # apply schema (tables + vector index)
-python -m payguard seed     # 15 suppliers, ~60 invoices incl. 1 fraud
-python -m payguard chat     # talk to the agent
+python -m payguard init-db   # apply schema (tables + vector index)
+python -m payguard s3-check  # verify bucket access before seeding (optional)
+python -m payguard seed      # 15 suppliers, ~60 invoices incl. 1 fraud, PDFs -> S3
+python -m payguard chat      # talk to the agent
 ```
 
-No Bedrock access yet? Set `EMBEDDINGS_PROVIDER=fake` in `.env` — the engine, crash tests and fraud detection all work offline; only the chat needs Bedrock.
+No Bedrock access yet? Set `EMBEDDINGS_PROVIDER=fake` in `.env` — the engine, crash tests and fraud detection all work offline; only the chat needs Bedrock. Leaving `S3_BUCKET` empty disables S3 the same way; `python -m payguard s3-sync` backfills the PDFs later, whenever you're ready.
 
 ## The five proofs of persistence
 

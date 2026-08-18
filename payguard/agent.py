@@ -11,7 +11,7 @@ tool-use loop (easy to demo and to reason about).
 """
 import uuid
 
-from anthropic import AnthropicBedrockMantle
+from anthropic import AnthropicBedrock
 
 from . import config, engine, tools
 from .db import get_conn
@@ -38,7 +38,7 @@ Rules you live by:
 
 class PayGuardAgent:
     def __init__(self, session_id: str | None = None):
-        self.client = AnthropicBedrockMantle(aws_region=config.AWS_REGION)
+        self.client = AnthropicBedrock(aws_region=config.AWS_REGION)
         self.model = config.BEDROCK_MODEL_ID
         self.session_id = session_id or f"session-{uuid.uuid4().hex[:8]}"
         self.messages: list[dict] = []  # context window only — NOT the memory

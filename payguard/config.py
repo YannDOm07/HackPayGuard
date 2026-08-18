@@ -16,6 +16,8 @@ EMBEDDINGS_PROVIDER = os.environ.get("EMBEDDINGS_PROVIDER", "bedrock")
 EMBED_DIMS = 1024
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
+# Bucket region — only needed if the bucket is NOT in AWS_REGION
+S3_REGION = os.environ.get("S3_REGION") or AWS_REGION
 
 PSP_LATENCY_MS = int(os.environ.get("PSP_LATENCY_MS", "300"))
 

@@ -14,6 +14,8 @@ def main() -> None:
     sub.add_parser("chat", help="interactive chat with the Bedrock agent")
     sub.add_parser("recover", help="startup recovery: finish every orphan payment")
     sub.add_parser("status", help="live view of payments (the split-screen)")
+    sub.add_parser("s3-check", help="verify S3 credentials and bucket access")
+    sub.add_parser("s3-sync", help="upload a PDF to S3 for every invoice missing one")
 
     pay = sub.add_parser("pay", help="pay an invoice through the state machine (no LLM)")
     pay.add_argument("invoice_id")
@@ -39,6 +41,13 @@ def main() -> None:
             print(f"payment {p['id']} -> {p['status']}"
                   + (f"  [{p.get('block_reason')}]" if p.get("block_reason") else ""))
             sys.exit(0 if p["status"] == "CONFIRMED" else 2)
+    elif args.cmd == "s3-check":
+        from . import s3
+        s3.check()
+    elif args.cmd == "s3-sync":
+        from . import s3
+        with get_conn() as conn:
+            s3.sync_invoices(conn)
     elif args.cmd == "status":
         _status()
 

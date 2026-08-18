@@ -92,6 +92,10 @@ def seed() -> None:
         ).fetchone()
         conn.commit()
 
+        # Source documents go to S3; the state stays in CockroachDB.
+        from . import s3
+        s3.sync_invoices(conn)
+
         print("\n[seed] pending invoices ready for the demo:")
         for name, iid, amount in pending:
             print(f"  CLEAN  {iid}  {name}  {amount} XOF")

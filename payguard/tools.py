@@ -54,6 +54,15 @@ TOOL_DEFS = [
         },
     },
     {
+        "name": "get_invoice_document",
+        "description": "Get a time-limited link to the original invoice PDF stored in Amazon S3. Use it when the user asks to see, check or audit the source document behind an invoice — especially after a payment was BLOCKED for fraud.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"invoice_id": {"type": "string", "description": "UUID of the invoice"}},
+            "required": ["invoice_id"],
+        },
+    },
+    {
         "name": "audit_query",
         "description": "Run a read-only SQL SELECT against the PayGuard database (tables: suppliers, invoices, payments, audit_log, psp_ledger, conversations). Use for natural-language audit questions like 'all payments above 100000 XOF in March'. Only SELECT is allowed.",
         "input_schema": {
@@ -115,6 +124,20 @@ def _dispatch(conn, name, args):
 
     if name == "check_invoice_fraud":
         return fraud.check_invoice(conn, args["invoice_id"])
+
+    if name == "get_invoice_document":
+        from . import s3
+        row = conn.execute(
+            "SELECT s3_key FROM invoices WHERE id = %s", (args["invoice_id"],)
+        ).fetchone()
+        if row is None:
+            return {"error": "invoice not found"}
+        if not row["s3_key"]:
+            return {"info": "no document stored in S3 for this invoice"}
+        if not s3.enabled():
+            return {"s3_key": row["s3_key"], "info": "S3 is not configured in this environment"}
+        return {"s3_key": row["s3_key"], "url": s3.presigned_url(row["s3_key"]),
+                "expires_in_seconds": 3600}
 
     if name == "audit_query":
         sql = args["sql"].strip().rstrip(";")
