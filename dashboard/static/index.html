@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayGuard — Dashboard</title>
+  <meta name="description" content="PayGuard autonomous CFO agent dashboard — chat, monitor payments, and inspect the agent's CockroachDB memory in real time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-deep:    #060a14;
+      --bg-base:    #0a0e1a;
+      --bg-card:    rgba(14, 20, 38, 0.75);
+      --bg-glass:   rgba(16, 24, 48, 0.55);
+      --border:     rgba(255, 255, 255, 0.06);
+      --border-glow:rgba(0, 212, 255, 0.15);
+      --text:       #e2e8f0;
+      --text-dim:   #64748b;
+      --text-muted: #475569;
+      --cyan:       #00d4ff;
+      --cyan-dim:   rgba(0, 212, 255, 0.12);
+      --emerald:    #00ff88;
+      --emerald-dim:rgba(0, 255, 136, 0.10);
+      --red:        #ff3366;
+      --red-dim:    rgba(255, 51, 102, 0.10);
+      --amber:      #ffaa00;
+      --amber-dim:  rgba(255, 170, 0, 0.10);
+      --blue:       #3b82f6;
+      --purple:     #a855f7;
+      --radius:     12px;
+      --radius-lg:  16px;
+      --radius-sm:  8px;
+      --font:       'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono:       'JetBrains Mono', 'Fira Code', monospace;
+      --shadow:     0 8px 32px rgba(0, 0, 0, 0.4);
+      --shadow-glow:0 0 40px rgba(0, 212, 255, 0.06);
+    }
+    html { font-size: 14px; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-deep);
+      color: var(--text);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Animated background ──────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0, 212, 255, 0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 80%, rgba(0, 255, 136, 0.03) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 10%, rgba(168, 85, 247, 0.03) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    .app { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
+
+    /* ── Header ────────────────────────────────────────────────── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-brand {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--cyan), var(--emerald));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 16px; color: var(--bg-deep);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+    }
+    .header-title {
+      font-size: 18px; font-weight: 700;
+      background: linear-gradient(135deg, var(--cyan), var(--emerald));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-subtitle { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+    .header-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--text-dim);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--emerald); }
+      50% { opacity: 0.5; box-shadow: 0 0 16px var(--emerald); }
+    }
+    .session-id { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+    /* ── Stats Bar ─────────────────────────────────────────────── */
+    .stats-bar {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+      padding: 12px 24px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 2px;
+      transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-glow);
+      transform: translateY(-1px);
+    }
+    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-weight: 600; }
+    .stat-value { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+    .stat-value.cyan { color: var(--cyan); }
+    .stat-value.emerald { color: var(--emerald); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.blue { color: var(--blue); }
+
+    /* ── Main Content ──────────────────────────────────────────── */
+    .main { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; min-height: 0; }
+
+    /* ── Chat Panel ────────────────────────────────────────────── */
+    .chat-panel {
+      display: flex; flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--bg-base);
+      min-height: 0;
+      overflow: hidden;
+    }
+    .chat-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text);
+    }
+    .chat-header-icon { color: var(--cyan); font-size: 16px; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 16px;
+      scroll-behavior: smooth;
+      min-height: 0;
+    }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Messages */
+    .msg { display: flex; flex-direction: column; gap: 4px; max-width: 85%; animation: msg-in 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.assistant { align-self: flex-start; align-items: flex-start; }
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .msg-bubble {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.65;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .msg.user .msg-bubble {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(0, 255, 136, 0.08));
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      color: var(--text);
+      border-bottom-right-radius: 4px;
+    }
+    .msg.assistant .msg-bubble {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .msg-time { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+
+    /* Tool call badges */
+    .tool-calls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .tool-badge {
+      font-size: 10px; font-family: var(--mono);
+      padding: 3px 8px; border-radius: 20px;
+      background: var(--cyan-dim);
+      color: var(--cyan); border: 1px solid rgba(0, 212, 255, 0.15);
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: none; align-self: flex-start;
+      padding: 14px 18px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      animation: msg-in 0.3s ease;
+    }
+    .typing-indicator.visible { display: flex; gap: 5px; align-items: center; }
+    .typing-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan);
+      animation: typing-bounce 1.4s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* Input area */
+    .chat-input-area {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      flex-shrink: 0;
+    }
+    .chat-input-wrap {
+      display: flex; gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+      transition: border-color 0.2s ease;
+    }
+    .chat-input-wrap:focus-within {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.08);
+    }
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none; outline: none;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 10px 12px;
+      resize: none;
+    }
+    .chat-input::placeholder { color: var(--text-muted); }
+    .chat-send {
+      padding: 8px 18px;
+      background: linear-gradient(135deg, var(--cyan), #0090b3);
+      color: var(--bg-deep);
+      border: none; border-radius: var(--radius-sm);
+      font-family: var(--font);
+      font-weight: 600; font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .chat-send:hover { box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); transform: scale(1.02); }
+    .chat-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    .chat-send svg { width: 14px; height: 14px; }
+
+    /* ── Data Panel ────────────────────────────────────────────── */
+    .data-panel {
+      display: flex; flex-direction: column;
+      background: var(--bg-base);
+    }
+    .tab-bar {
+      display: flex; gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+    }
+    .tab-btn {
+      padding: 14px 20px;
+      font-size: 12px; font-weight: 600;
+      color: var(--text-dim);
+      background: transparent;
+      border: none; border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.02); }
+    .tab-btn.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+      background: rgba(0, 212, 255, 0.04);
+    }
+    .tab-content {
+      flex: 1; overflow-y: auto; padding: 16px;
+    }
+    .tab-content::-webkit-scrollbar { width: 4px; }
+    .tab-content::-webkit-scrollbar-track { background: transparent; }
+    .tab-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Tables ─────────────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .data-table thead th {
+      position: sticky; top: 0; z-index: 2;
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      background: var(--bg-base);
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table tbody tr {
+      transition: background 0.15s ease;
+    }
+    .data-table tbody tr:hover {
+      background: rgba(0, 212, 255, 0.03);
+    }
+    .data-table td {
+      padding: 10px 12px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .data-table .mono { font-family: var(--mono); font-size: 11px; }
+
+    /* Status badges */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .status-badge::before {
+      content: ''; display: block;
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+    .status-CONFIRMED { background: var(--emerald-dim); color: var(--emerald); }
+    .status-CONFIRMED::before { background: var(--emerald); box-shadow: 0 0 6px var(--emerald); }
+    .status-BLOCKED { background: var(--red-dim); color: var(--red); }
+    .status-BLOCKED::before { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .status-EXECUTING, .status-VALIDATED { background: var(--amber-dim); color: var(--amber); }
+    .status-EXECUTING::before, .status-VALIDATED::before { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+    .status-EXECUTED { background: var(--cyan-dim); color: var(--cyan); }
+    .status-EXECUTED::before { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+    .status-INTENT { background: rgba(168, 85, 247, 0.10); color: var(--purple); }
+    .status-INTENT::before { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+    .status-RECEIVED { background: rgba(59, 130, 246, 0.10); color: var(--blue); }
+    .status-RECEIVED::before { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+    .status-PAID { background: var(--emerald-dim); color: var(--emerald); }
+    .status-PAID::before { background: var(--emerald); box-shadow: 0 0 6px var(--emerald); }
+
+    /* Amount styling */
+    .amount { font-family: var(--mono); font-weight: 600; color: var(--text); }
+    .currency { font-size: 10px; color: var(--text-dim); margin-left: 3px; }
+
+    /* ── Welcome message ───────────────────────────────────────── */
+    .welcome {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-dim);
+    }
+    .welcome-icon {
+      width: 56px; height: 56px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--cyan), var(--emerald));
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+    }
+    .welcome h2 {
+      font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+    }
+    .welcome p { font-size: 12px; line-height: 1.6; max-width: 360px; margin: 0 auto; }
+    .welcome-hints {
+      margin-top: 20px;
+      display: flex; flex-direction: column; gap: 6px;
+      align-items: center;
+    }
+    .welcome-hint {
+      font-size: 11px; font-family: var(--mono);
+      padding: 6px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-dim);
+    }
+    .welcome-hint:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: var(--cyan-dim);
+    }
+
+    /* ── Empty state ───────────────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 40px 20px;
+      color: var(--text-muted); font-size: 13px;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+      .chat-panel { min-height: 50vh; }
+      .stats-bar { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* ── Fade-in animation for rows ───────────────────────────── */
+    @keyframes row-in {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .data-table tbody tr { animation: row-in 0.3s ease; }
+
+    /* ── Number formatting helper ──────────────────────────────── */
+    .supplier-name { font-weight: 500; color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="header-logo">P</div>
+        <div>
+          <div class="header-title">PayGuard</div>
+          <div class="header-subtitle">Autonomous CFO Agent · CockroachDB Memory</div>
+        </div>
+      </div>
+      <div class="header-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="connectionStatus">Connected</span>
+        <span class="session-id" id="sessionId"></span>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card">
+        <span class="stat-label">Total Payments</span>
+        <span class="stat-value cyan" id="statTotalPayments">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Confirmed</span>
+        <span class="stat-value emerald" id="statConfirmed">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Blocked</span>
+        <span class="stat-value red" id="statBlocked">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Invoices</span>
+        <span class="stat-value blue" id="statInvoices">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Confirmed Amount</span>
+        <span class="stat-value amber" id="statAmount">—</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Chat Panel -->
+      <div class="chat-panel">
+        <div class="chat-header">
+          <span class="chat-header-icon">💬</span>
+          Chat with PayGuard
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="welcome" id="welcomeMsg">
+            <div class="welcome-icon">🛡️</div>
+            <h2>PayGuard Agent</h2>
+            <p>Talk to your autonomous CFO. Every answer comes from CockroachDB — the agent's real, persistent memory.</p>
+            <div class="welcome-hints">
+              <span class="welcome-hint" onclick="sendHint(this)">liste les factures à payer</span>
+              <span class="welcome-hint" onclick="sendHint(this)">quels paiements as-tu effectués ?</span>
+              <span class="welcome-hint" onclick="sendHint(this)">paie la facture de Fournisseur BTP Yamoussoukro</span>
+              <span class="welcome-hint" onclick="sendHint(this)">show all blocked payments</span>
+            </div>
+          </div>
+          <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Talk to PayGuard…" autocomplete="off">
+            <button class="chat-send" id="chatSend" onclick="sendMessage()">
+              Send
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Panel -->
+      <div class="data-panel">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="payments" onclick="switchTab('payments')">⚡ Payments</button>
+          <button class="tab-btn" data-tab="invoices" onclick="switchTab('invoices')">📄 Invoices</button>
+          <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">🏢 Suppliers</button>
+        </div>
+        <div class="tab-content">
+          <div class="tab-pane active" id="tab-payments">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Supplier</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Idempotency Key</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsBody"></tbody>
+            </table>
+            <div class="empty-state" id="paymentsEmpty">No payments yet.</div>
+          </div>
+          <div class="tab-pane" id="tab-invoices">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Supplier</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Due Date</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="invoicesBody"></tbody>
+            </table>
+            <div class="empty-state" id="invoicesEmpty">No invoices found.</div>
+          </div>
+          <div class="tab-pane" id="tab-suppliers">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Account</th>
+                  <th>Invoices</th>
+                  <th>Total Amount</th>
+                </tr>
+              </thead>
+              <tbody id="suppliersBody"></tbody>
+            </table>
+            <div class="empty-state" id="suppliersEmpty">No suppliers found.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────────
+    const API = '';  // same origin
+    let isWaiting = false;
+
+    // ── Format helpers ──────────────────────────────────────────
+    function fmtAmount(v) {
+      const n = parseFloat(v);
+      if (isNaN(n)) return v;
+      return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+    }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    function fmtDateTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    function fmtTime() {
+      return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    }
+    function statusBadge(s) {
+      return `<span class="status-badge status-${s}">${s}</span>`;
+    }
+
+    // ── Chat ────────────────────────────────────────────────────
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput    = document.getElementById('chatInput');
+    const chatSend     = document.getElementById('chatSend');
+    const typingInd    = document.getElementById('typingIndicator');
+    const welcomeMsg   = document.getElementById('welcomeMsg');
+
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    function sendHint(el) {
+      chatInput.value = el.textContent;
+      sendMessage();
+    }
+
+    function addMessage(role, text, toolCalls) {
+      if (welcomeMsg) welcomeMsg.style.display = 'none';
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      let html = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
+      if (toolCalls && toolCalls.length > 0) {
+        html += '<div class="tool-calls">';
+        toolCalls.forEach(tc => {
+          html += `<span class="tool-badge">🔧 ${tc.name}</span>`;
+        });
+        html += '</div>';
+      }
+      html += `<span class="msg-time">${fmtTime()}</span>`;
+      div.innerHTML = html;
+      chatMessages.insertBefore(div, typingInd);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text || isWaiting) return;
+
+      addMessage('user', text);
+      chatInput.value = '';
+      isWaiting = true;
+      chatSend.disabled = true;
+      typingInd.classList.add('visible');
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const res = await fetch(`${API}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          addMessage('assistant', `⚠️ Error: ${data.error}`, data.tool_calls);
+        } else {
+          addMessage('assistant', data.reply, data.tool_calls);
+          if (data.session_id) {
+            document.getElementById('sessionId').textContent = data.session_id;
+          }
+        }
+        // Refresh data panels after a chat (payments may have changed)
+        loadPayments();
+        loadStats();
+      } catch (err) {
+        addMessage('assistant', `⚠️ Connection error: ${err.message}`);
+        setDisconnected();
+      } finally {
+        isWaiting = false;
+        chatSend.disabled = false;
+        typingInd.classList.remove('visible');
+      }
+    }
+
+    // ── Tabs ────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+
+      if (tab === 'invoices') loadInvoices();
+      if (tab === 'suppliers') loadSuppliers();
+    }
+
+    // ── Data loaders ────────────────────────────────────────────
+    async function loadPayments() {
+      try {
+        const res = await fetch(`${API}/api/payments`);
+        const data = await res.json();
+        const tbody = document.getElementById('paymentsBody');
+        const empty = document.getElementById('paymentsEmpty');
+        if (data.length === 0) {
+          tbody.innerHTML = '';
+          empty.style.display = 'block';
+          return;
+        }
+        empty.style.display = 'none';
+        tbody.innerHTML = data.map(p => `
+          <tr>
+            <td class="supplier-name">${escapeHtml(p.supplier || '—')}</td>
+            <td><span class="amount">${fmtAmount(p.amount)}</span><span class="currency">XOF</span></td>
+            <td>${statusBadge(p.status)}</td>
+            <td class="mono">${p.idempotency_key || '—'}</td>
+            <td class="mono">${fmtDateTime(p.updated_at)}</td>
+          </tr>
+        `).join('');
+        setConnected();
+      } catch (e) {
+        setDisconnected();
+      }
+    }
+
+    async function loadInvoices() {
+      try {
+        const res = await fetch(`${API}/api/invoices`);
+        const data = await res.json();
+        const tbody = document.getElementById('invoicesBody');
+        const empty = document.getElementById('invoicesEmpty');
+        if (data.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        tbody.innerHTML = data.map(i => `
+          <tr>
+            <td class="supplier-name">${escapeHtml(i.supplier || '—')}</td>
+            <td><span class="amount">${fmtAmount(i.amount)}</span><span class="currency">${i.currency || 'XOF'}</span></td>
+            <td>${statusBadge(i.status)}</td>
+            <td class="mono">${fmtDate(i.due_date)}</td>
+            <td class="mono">${fmtDateTime(i.created_at)}</td>
+          </tr>
+        `).join('');
+      } catch (e) { /* silent */ }
+    }
+
+    async function loadSuppliers() {
+      try {
+        const res = await fetch(`${API}/api/suppliers`);
+        const data = await res.json();
+        const tbody = document.getElementById('suppliersBody');
+        const empty = document.getElementById('suppliersEmpty');
+        if (data.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        tbody.innerHTML = data.map(s => `
+          <tr>
+            <td class="supplier-name">${escapeHtml(s.name)}</td>
+            <td class="mono">${s.payment_account || '—'}</td>
+            <td class="mono">${s.invoice_count}</td>
+            <td><span class="amount">${fmtAmount(s.total_amount)}</span><span class="currency">XOF</span></td>
+          </tr>
+        `).join('');
+      } catch (e) { /* silent */ }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API}/api/stats`);
+        const data = await res.json();
+        document.getElementById('statTotalPayments').textContent = data.total_payments;
+        document.getElementById('statConfirmed').textContent = data.confirmed;
+        document.getElementById('statBlocked').textContent = data.blocked;
+        document.getElementById('statInvoices').textContent = data.total_invoices;
+        document.getElementById('statAmount').textContent = fmtAmount(data.total_confirmed_amount) + ' XOF';
+      } catch (e) { /* silent */ }
+    }
+
+    // ── Connection status ───────────────────────────────────────
+    function setConnected() {
+      const dot = document.getElementById('statusDot');
+      dot.style.background = 'var(--emerald)';
+      dot.style.boxShadow = '0 0 8px var(--emerald)';
+      document.getElementById('connectionStatus').textContent = 'Connected';
+    }
+    function setDisconnected() {
+      const dot = document.getElementById('statusDot');
+      dot.style.background = 'var(--red)';
+      dot.style.boxShadow = '0 0 8px var(--red)';
+      document.getElementById('connectionStatus').textContent = 'Disconnected';
+    }
+
+    // ── Init & auto-refresh ─────────────────────────────────────
+    loadPayments();
+    loadStats();
+    loadInvoices();
+
+    // Live refresh every 2 seconds (like the CLI status view)
+    setInterval(() => {
+      loadPayments();
+      loadStats();
+    }, 2000);
+  </script>
+</body>
+</html>

@@ -16,6 +16,7 @@ def main() -> None:
     sub.add_parser("status", help="live view of payments (the split-screen)")
     sub.add_parser("s3-check", help="verify S3 credentials and bucket access")
     sub.add_parser("s3-sync", help="upload a PDF to S3 for every invoice missing one")
+    sub.add_parser("dashboard", help="launch the web dashboard (chat + live status)")
 
     pay = sub.add_parser("pay", help="pay an invoice through the state machine (no LLM)")
     pay.add_argument("invoice_id")
@@ -48,6 +49,9 @@ def main() -> None:
         from . import s3
         with get_conn() as conn:
             s3.sync_invoices(conn)
+    elif args.cmd == "dashboard":
+        from dashboard.app import run_dashboard
+        run_dashboard()
     elif args.cmd == "status":
         _status()
 
