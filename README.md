@@ -114,6 +114,20 @@ All crash scenarios are also automated: `pytest tests/ -v` kills the process at 
 - The **vector type + vector index** made the anti-fraud RAG a one-liner (`ORDER BY embedding <=> $1`) — no second database to keep consistent with the transactional data, which is exactly what an agent's memory needs.
 - The **managed MCP server** turns the cluster into an inspectable memory: judges (or auditors!) can interrogate the agent's state in natural language without trusting the agent's own words.
 
+
+ 5. Launch the Web Dashboard 🚀
+
+```bash
+python -m payguard dashboard
+```
+
+Open your browser at **[http://localhost:5000](http://localhost:5000)**.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+
