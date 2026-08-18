@@ -12,9 +12,9 @@ double paiement structurellement impossible : toute sa mémoire vit dans
 CockroachDB, écrite AVANT chaque action. »
 
 ## 0:25 – 1:00 — Démo nominale en split-screen
-Terminal gauche :
+Terminal gauche (facture Imprimerie Abidjan, 85 000 XOF) :
 ```
-python -m payguard pay <ID_FACTURE_PROPRE>
+python -m payguard pay 05dcd9a6-50d2-497a-bea4-810c09fe70d4
 ```
 Montrer à droite les statuts qui défilent en live : INTENT → VALIDATED →
 EXECUTING → EXECUTED → CONFIRMED.
@@ -22,9 +22,10 @@ EXECUTING → EXECUTED → CONFIRMED.
 droite lit directement la base : l'agent n'hallucine pas ses souvenirs. »
 
 ## 1:00 – 1:45 — LE crash test (le moment fort)
+Facture Sankara Tech, 320 000 XOF :
 ```
 $env:CRASH_AT = "AFTER_PSP_CALL"
-python -m payguard pay <ID_FACTURE_PROPRE_2>
+python -m payguard pay 18441477-2ac1-4542-a752-f9850ba7099b
 ```
 « Le process vient de MOURIR juste après l'envoi de l'argent — la base ne le
 sait pas encore. Le pire scénario. On redémarre : »
