@@ -1,0 +1,33 @@
+# Render.com blueprint — deploys the PayGuard dashboard from this repo.
+# In the Render UI: New + > Blueprint > select this repo, then fill the
+# environment variables marked sync:false (values come from the team .env).
+services:
+  - type: web
+    name: payguard-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard.app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: DATABASE_URL
+        sync: false        # CockroachDB connection string (use sslmode=require on Render)
+      - key: AWS_REGION
+        value: eu-central-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: BEDROCK_MODEL_ID
+        value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+      - key: EMBED_MODEL_ID
+        value: amazon.titan-embed-text-v2:0
+      - key: EMBEDDINGS_PROVIDER
+        value: fake
+      - key: S3_BUCKET
+        value: payguard-demo-2026
+      - key: S3_REGION
+        value: eu-central-1
+      - key: PSP_LATENCY_MS
+        value: "300"
