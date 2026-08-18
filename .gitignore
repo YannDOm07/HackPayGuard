@@ -1,4 +1,10 @@
 .env
+# internal team docs — keep local, never push
+DEVPOST_SUBMISSION.md
+DEVPOST_ADDITIONAL_INFO.md
+EQUIPE_ETAT_ET_ACTIONS.md
+PASSATION_CHEF_EQUIPE.md
+PayGuard_Document_Projet_et_Roadmap.md
 __pycache__/
 *.pyc
 .pytest_cache/
